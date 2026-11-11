@@ -3,7 +3,7 @@
 Демо на основе последней локальной версии Mini App «Вышка 24». Адаптировано под услуги и фирменный стиль https://transport-logistics.by/ (проверено 11 ноября 2026).
 
 ## Просмотр
-https://websitepreview26.github.io/transport-logistics-miniapp-demo/
+https://websitepreview26.github.io/tl-demo/
 
 ## Запуск
 Без сборки и зависимостей:
