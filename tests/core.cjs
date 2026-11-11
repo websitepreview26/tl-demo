@@ -4,7 +4,7 @@ const vm = require('node:vm');
 const fs = require('node:fs');
 const source = fs.readFileSync('dist/assets/app.js', 'utf8');
 // Run the actual pure helpers without a browser or copied implementation.
-const functions = ['route','detailsValid','validDay','fillEmpty','localDay','estimate'].map(name => source.split('\n').find(line => line.startsWith(`function ${name}(`))).join('\n');
+const functions = ['route','detailsValid','validDay','fillEmpty','localDay','estimate','orderPhase','orderHistory'].map(name => source.split('\n').find(line => line.startsWith(`function ${name}(`))).join('\n');
 const context = vm.createContext({location:{hash:'#home'},db:{draft:{}}, Date});
 vm.runInContext(functions,context);
 const valid = {type:'hydro',address:'Минск, ул. Тестовая, 1',destination:'Минск, ул. Тестовая, 2',cargo:'Оборудование',weight:'800',volume:'4',day:'',hours:'3',km:'0'};
@@ -30,4 +30,16 @@ test('invalid hours, distances, weight, volume and dates cannot be submitted',()
 });
 test('hydrolift calculation uses hours and outside-MKAD mileage',()=>{
  assert.equal(context.estimate({...valid,hours:'4',km:'25'}),325);
+});
+
+test('request progress advances and stays in place during discussion',()=>{
+ for(const [o,phase] of [[{status:'new'},1],[{status:'question'},1],[{status:'offer',offer:{}},2],[{status:'question',offer:{}},2],[{status:'accepted',accepted:0},3],[{status:'scheduled',accepted:0},4],[{status:'completed',accepted:0},4]])assert.equal(context.orderPhase(o),phase);
+});
+test('existing requests use only known historical timestamps',()=>{
+ const history=context.orderHistory({created:1000,status:'accepted',accepted:0,offer:{sent:2000}});
+ assert.equal(history.find(e=>e.status==='received').at,1000);
+ assert.equal(history.find(e=>e.status==='offer').at,2000);
+ assert.equal(history.some(e=>e.status==='accepted'),false);
+ const saved=[{status:'accepted',at:3000}];
+ assert.equal(context.orderHistory({history:saved})[0].at,3000);
 });
