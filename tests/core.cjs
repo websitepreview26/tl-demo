@@ -1,0 +1,33 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const vm = require('node:vm');
+const fs = require('node:fs');
+const source = fs.readFileSync('dist/assets/app.js', 'utf8');
+// Run the actual pure helpers without a browser or copied implementation.
+const functions = ['route','detailsValid','validDay','fillEmpty','localDay','estimate'].map(name => source.split('\n').find(line => line.startsWith(`function ${name}(`))).join('\n');
+const context = vm.createContext({location:{hash:'#home'},db:{draft:{}}, Date});
+vm.runInContext(functions,context);
+const valid = {type:'hydro',address:'Минск, ул. Тестовая, 1',destination:'Минск, ул. Тестовая, 2',cargo:'Оборудование',weight:'800',volume:'4',day:'',hours:'3',km:'0'};
+test('Telegram launch hash opens home instead of a broken route',()=>{
+ context.location.hash='#tgWebAppVersion=9.6&tgWebAppPlatform=macos';
+ assert.equal(context.route().page,'home');
+});
+test('contact step requires valid route and cargo',()=>{
+ context.location.hash='#request/contact';context.db.draft={...valid,address:''};
+ assert.equal(context.route().id,undefined);
+ context.db.draft={...valid};assert.equal(context.route().id,'contact');
+});
+test('sample fills only empty fields and preserves user values',()=>{
+ const draft={address:'Мой адрес',hours:'5',phone:'',weight:'900'};
+ assert.equal(context.fillEmpty(draft,{address:'Пример',phone:'+375290000000',hours:'3',weight:'800'}),1);
+ assert.deepEqual(draft,{address:'Мой адрес',hours:'5',phone:'+375290000000',weight:'900'});
+ assert.equal(context.fillEmpty(draft,{phone:'Другой номер'}),0);
+});
+test('invalid hours, distances, weight, volume and dates cannot be submitted',()=>{
+ assert.equal(context.detailsValid(valid),true);
+ for(const change of [{hours:'2'},{hours:'3.5'},{km:''},{km:'-1'},{weight:'-5'},{volume:'0'},{day:'2026-99-99'},{day:'2020-01-01'}])assert.equal(context.detailsValid({...valid,...change}),false,JSON.stringify(change));
+ assert.equal(context.detailsValid({...valid,type:'freight',hours:'',km:''}),true);
+});
+test('hydrolift calculation uses hours and outside-MKAD mileage',()=>{
+ assert.equal(context.estimate({...valid,hours:'4',km:'25'}),325);
+});
